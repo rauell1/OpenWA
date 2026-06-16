@@ -198,6 +198,27 @@ export PROXY_URL=http://proxy:8080
 docker compose up -d
 ```
 
+### Issue: Session stuck at `authenticating`, never reaches `ready`
+
+**Symptoms:** After scanning the QR the phone links the device, but the session stays at
+`authenticating` indefinitely and never becomes `ready`. `GET /sessions/:id/qr` returns 400 while
+stuck. Often seen on ARM64 (e.g. Raspberry Pi) after upgrading to v0.2.x.
+
+**Cause:** whatsapp-web.js auto-selects a WhatsApp Web client version, and an incompatible version
+stalls the post-link sync. (The `chrome_crashpad_handler: --database is required` log is a separate,
+harmless line — Chromium still launches.)
+
+**Fix:** pin a known-good WhatsApp Web version with `WWEBJS_WEB_VERSION`:
+
+```bash
+# Confirmed to reach "ready" (incl. ARM64 / Raspberry Pi 5):
+WWEBJS_WEB_VERSION=2.3000.1023204257
+```
+
+Restart the container after setting it. Browse newer versions at
+[wppconnect-team/wa-version](https://github.com/wppconnect-team/wa-version) (the `html/` folder).
+Set `WWEBJS_WEB_VERSION=latest` (or leave it unset) to restore the default auto-version behavior.
+
 ### Issue: Frequent Disconnections
 
 **Symptoms:**
