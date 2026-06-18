@@ -23,12 +23,11 @@ export function mapBaileysGroup(metadata: GroupMetadata, selfJid: string): Group
 }
 
 /** Map a Baileys GroupMetadata to the neutral {@link GroupInfo} (full participant list). */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function mapBaileysGroupInfo(metadata: GroupMetadata, selfJid: string): GroupInfo {
+export function mapBaileysGroupInfo(metadata: GroupMetadata): GroupInfo {
   const participants: GroupParticipant[] = metadata.participants.map(p => ({
     id: p.id,
     number: userPart(p.id),
-    name: p.name ?? undefined,
+    name: p.name,
     isAdmin: p.admin === 'admin' || p.admin === 'superadmin',
     isSuperAdmin: p.admin === 'superadmin',
   }));

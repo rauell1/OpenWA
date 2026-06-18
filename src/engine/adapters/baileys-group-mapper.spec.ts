@@ -33,6 +33,11 @@ describe('mapBaileysGroup', () => {
     expect(mapBaileysGroup(meta(), '628111@s.whatsapp.net').isAdmin).toBe(false);
   });
 
+  it('isAdmin is true when self is a plain admin', () => {
+    const m = meta({ participants: [{ id: '628222@s.whatsapp.net', admin: 'admin' }] });
+    expect(mapBaileysGroup(m, '628222@s.whatsapp.net').isAdmin).toBe(true);
+  });
+
   it('carries the linked community parent when present', () => {
     expect(mapBaileysGroup(meta({ linkedParent: '999@g.us' }), 'x@s.whatsapp.net').linkedParentJID).toBe('999@g.us');
   });
@@ -40,7 +45,7 @@ describe('mapBaileysGroup', () => {
 
 describe('mapBaileysGroupInfo', () => {
   it('maps full info incl. participants admin/superadmin', () => {
-    const info = mapBaileysGroupInfo(meta({ announce: true }), '628999@s.whatsapp.net');
+    const info = mapBaileysGroupInfo(meta({ announce: true }));
     expect(info.id).toBe('123-456@g.us');
     expect(info.name).toBe('My Group');
     expect(info.description).toBe('a description');
