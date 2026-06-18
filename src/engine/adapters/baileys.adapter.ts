@@ -5,7 +5,7 @@ import makeWASocket, {
   getContentType,
   useMultiFileAuthState,
 } from '@whiskeysockets/baileys';
-import type { WAMessage, WASocket } from '@whiskeysockets/baileys';
+import type { AnyMessageContent, WAMessage, WASocket } from '@whiskeysockets/baileys';
 import { buildIncomingMessageFromBaileys, mapBaileysStatus } from './baileys-message-mapper';
 import type { ILogger } from '@whiskeysockets/baileys/lib/Utils/logger.js';
 import {
@@ -34,6 +34,7 @@ import {
   ChatSummary,
   TextStatusOptions,
 } from '../interfaces/whatsapp-engine.interface';
+import { loadRemoteMediaBuffer } from '../../common/media/load-remote-media';
 import { EngineNotReadyError } from '../../common/errors/engine-not-ready.error';
 import { EngineNotSupportedError } from '../../common/errors/engine-not-supported.error';
 import { createLogger } from '../../common/services/logger.service';
@@ -249,29 +250,44 @@ export class BaileysAdapter implements IWhatsAppEngine {
     await this.sock!.sendPresenceUpdate(presence, chatId);
   }
 
+  async sendImageMessage(chatId: string, media: MediaInput): Promise<MessageResult> {
+    this.ensureReady();
+    const { data, mimetype } = await this.resolveMediaBuffer(media);
+    return this.sendContent(chatId, { image: data, caption: media.caption, mimetype });
+  }
+
+  async sendVideoMessage(chatId: string, media: MediaInput): Promise<MessageResult> {
+    this.ensureReady();
+    const { data, mimetype } = await this.resolveMediaBuffer(media);
+    return this.sendContent(chatId, { video: data, caption: media.caption, mimetype });
+  }
+
+  async sendAudioMessage(chatId: string, media: MediaInput): Promise<MessageResult> {
+    this.ensureReady();
+    const { data, mimetype } = await this.resolveMediaBuffer(media);
+    return this.sendContent(chatId, { audio: data, mimetype, ptt: false });
+  }
+
+  async sendDocumentMessage(chatId: string, media: MediaInput): Promise<MessageResult> {
+    this.ensureReady();
+    const { data, mimetype } = await this.resolveMediaBuffer(media);
+    return this.sendContent(chatId, { document: data, mimetype, fileName: media.filename ?? 'file' });
+  }
+
+  async sendStickerMessage(chatId: string, media: MediaInput): Promise<MessageResult> {
+    this.ensureReady();
+    const { data } = await this.resolveMediaBuffer(media);
+    return this.sendContent(chatId, { sticker: data });
+  }
+
   // ----- Gated: not supported by this minimal slice (no store) -----
   /* eslint-disable @typescript-eslint/no-unused-vars */
 
-  sendImageMessage(_chatId: string, _media: MediaInput): Promise<MessageResult> {
-    return this.unsupported('sendImageMessage');
-  }
-  sendVideoMessage(_chatId: string, _media: MediaInput): Promise<MessageResult> {
-    return this.unsupported('sendVideoMessage');
-  }
-  sendAudioMessage(_chatId: string, _media: MediaInput): Promise<MessageResult> {
-    return this.unsupported('sendAudioMessage');
-  }
-  sendDocumentMessage(_chatId: string, _media: MediaInput): Promise<MessageResult> {
-    return this.unsupported('sendDocumentMessage');
-  }
   sendLocationMessage(_chatId: string, _location: LocationInput): Promise<MessageResult> {
     return this.unsupported('sendLocationMessage');
   }
   sendContactMessage(_chatId: string, _contact: ContactCard): Promise<MessageResult> {
     return this.unsupported('sendContactMessage');
-  }
-  sendStickerMessage(_chatId: string, _media: MediaInput): Promise<MessageResult> {
-    return this.unsupported('sendStickerMessage');
   }
   replyToMessage(_chatId: string, _quotedMsgId: string, _text: string): Promise<MessageResult> {
     return this.unsupported('replyToMessage');
@@ -479,6 +495,25 @@ export class BaileysAdapter implements IWhatsAppEngine {
       return Math.floor(Date.now() / 1000);
     }
     return typeof ts === 'number' ? ts : ts.toNumber();
+  }
+
+  /** Resolve a MediaInput's data (Buffer | base64 string | http(s) URL) to bytes + mimetype. */
+  private async resolveMediaBuffer(media: MediaInput): Promise<{ data: Buffer; mimetype: string }> {
+    if (Buffer.isBuffer(media.data)) {
+      return { data: media.data, mimetype: media.mimetype };
+    }
+    if (/^https?:\/\//i.test(media.data)) {
+      const fetched = await loadRemoteMediaBuffer(media.data);
+      // Caller's declared mimetype wins; fall back to the response content-type.
+      return { data: fetched.data, mimetype: media.mimetype || fetched.mimetype };
+    }
+    return { data: Buffer.from(media.data, 'base64'), mimetype: media.mimetype };
+  }
+
+  /** Send a Baileys content object and shape the result like the other sends. */
+  private async sendContent(chatId: string, content: AnyMessageContent): Promise<MessageResult> {
+    const sent = await this.sock!.sendMessage(chatId, content);
+    return { id: sent?.key?.id ?? '', timestamp: this.toUnixSeconds(sent?.messageTimestamp) };
   }
 
   private unsupported(method: string): Promise<any> {
