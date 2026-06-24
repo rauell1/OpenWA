@@ -2,14 +2,12 @@ import { type DynamicModule, Module, type MiddlewareConsumer, type NestModule } 
 import { HttpAdapterHost } from '@nestjs/core';
 import { ToolRegistryService } from '../../core/agent-tools/tool-registry.service';
 import { AuthService } from '../auth/auth.service';
-import { KeyRateLimiter } from './mcp-rate-limit';
+import { KeyRateLimiter, readRateLimitConfig } from './mcp-rate-limit';
 import { mountMcpServer } from './mcp.server';
 
 export interface McpModuleOptions {
   basePath?: string;
   serverInfo?: { name: string; version: string };
-  rateLimitMax?: number;
-  rateLimitWindowMs?: number;
 }
 
 // Module-level options store: set by forRoot(), read by configure().
@@ -40,8 +38,9 @@ export class McpModule implements NestModule {
     if (!httpAdapter) {
       throw new Error('McpModule: HttpAdapterHost.httpAdapter is not available.');
     }
-    const { rateLimitMax, rateLimitWindowMs, basePath, serverInfo } = _moduleOptions;
-    const rateLimiter = new KeyRateLimiter(rateLimitMax, rateLimitWindowMs);
+    const { basePath, serverInfo } = _moduleOptions;
+    const { max, windowMs } = readRateLimitConfig();
+    const rateLimiter = new KeyRateLimiter(max, windowMs);
     mountMcpServer(httpAdapter, this.registry, this.authService, rateLimiter, { basePath, serverInfo });
   }
 }

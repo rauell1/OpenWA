@@ -1,4 +1,45 @@
-import { KeyRateLimiter } from './mcp-rate-limit';
+import { KeyRateLimiter, readRateLimitConfig } from './mcp-rate-limit';
+
+describe('readRateLimitConfig', () => {
+  it('returns defaults for an empty env', () => {
+    expect(readRateLimitConfig({})).toEqual({ max: 60, windowMs: 60_000 });
+  });
+
+  it('parses valid numeric env values', () => {
+    expect(readRateLimitConfig({ MCP_RATE_LIMIT_MAX: '120', MCP_RATE_LIMIT_WINDOW_MS: '30000' })).toEqual({
+      max: 120,
+      windowMs: 30_000,
+    });
+  });
+
+  it('falls back to defaults for non-numeric values', () => {
+    expect(readRateLimitConfig({ MCP_RATE_LIMIT_MAX: 'abc', MCP_RATE_LIMIT_WINDOW_MS: 'abc' })).toEqual({
+      max: 60,
+      windowMs: 60_000,
+    });
+  });
+
+  it('falls back to defaults for zero', () => {
+    expect(readRateLimitConfig({ MCP_RATE_LIMIT_MAX: '0', MCP_RATE_LIMIT_WINDOW_MS: '0' })).toEqual({
+      max: 60,
+      windowMs: 60_000,
+    });
+  });
+
+  it('falls back to defaults for negative values', () => {
+    expect(readRateLimitConfig({ MCP_RATE_LIMIT_MAX: '-5', MCP_RATE_LIMIT_WINDOW_MS: '-5' })).toEqual({
+      max: 60,
+      windowMs: 60_000,
+    });
+  });
+
+  it('falls back to defaults for blank strings', () => {
+    expect(readRateLimitConfig({ MCP_RATE_LIMIT_MAX: '', MCP_RATE_LIMIT_WINDOW_MS: '' })).toEqual({
+      max: 60,
+      windowMs: 60_000,
+    });
+  });
+});
 
 describe('KeyRateLimiter', () => {
   it('allows up to max per window, then throws 429', () => {
